@@ -805,6 +805,7 @@ spec:
 
 
 1. **Accéder à l'application** :
+   Configurer une redirection de port vers l'ip du cluster Minikube.
    Une fois le fichier `hosts` configuré **si nécéssaire**, ouvrez un navigateur et accédez à l'URL suivante :
    ```
    http://localhost:80
