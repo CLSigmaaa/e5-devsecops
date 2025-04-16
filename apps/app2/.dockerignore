@@ -1,0 +1,40 @@
+# Ignorer les fichiers et dossiers Python inutiles
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.env
+*.venv
+*.egg-info/
+.eggs/
+
+# Ignorer les fichiers de logs
+*.log
+*.out
+*.err
+
+# Ignorer les fichiers de configuration locaux
+.env
+.vscode/
+.idea/
+*.swp
+
+# Ignorer les fichiers de tests
+tests/
+*.pytest_cache/
+.tox/
+
+# Ignorer les fichiers de contrôle de version
+.git/
+.gitignore
+
+# Ignorer les bases de données locales
+*.db
+*.sqlite3
+
+# Ignorer les fichiers temporaires ou de cache
+*.bak
+*.tmp
+*.cache
+*.DS_Store
+Thumbs.db
