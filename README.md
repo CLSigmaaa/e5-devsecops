@@ -32,7 +32,7 @@ k8s-maquette/
 ├── apps/
 │   ├── app1/ (port 80)
 │   ├── app2/ (port 8080)
-│   └── app3/ (port 9090)
+│   └── app3/ (port 9000)
 │
 ├── k8s/
 │   ├── app1-deployment.yaml
@@ -509,6 +509,9 @@ spec:
 ```
 Service pour app1 (app1-service.yaml):
 Ce manifeste crée un service de type NodePort pour exposer l'application Django (app1) sur le port 80.
+
+Un NodePort a été utilisé car l'application n'est pas critique et peut être exposée sur un port spécifique de chaque nœud du cluster. Cela permet d'accéder à l'application depuis l'extérieur du cluster en utilisant l'adresse IP du nœud et le port exposé. De plus, cela facilite le test et le développement local.
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -595,6 +598,31 @@ spec:
 ```
 Service pour app3 (app3-service.yaml):
 Ce manifeste crée un service de type LoadBalancer pour exposer l'application Django (app3) sur le port 9000.
+
+### Justification de l'utilisation d'un LoadBalancer pour App3 (Django)
+
+Cette application étant l'application Django critique, il est important de justifier l'utilisation d'un LoadBalancer pour son déploiement.
+
+L'utilisation d'un **LoadBalancer** pour l'application App3 (Django) est justifiée par les raisons suivantes :
+
+1. **Accès externe simplifié**  
+  Le type de service LoadBalancer permet d'exposer directement l'application à l'extérieur du cluster Kubernetes avec une adresse IP publique ou privée (selon l'environnement). Cela facilite l'accès à l'application sans nécessiter de configuration supplémentaire, comme un NodePort ou un Ingress.
+
+2. **Distribution du trafic**  
+  Si App3 est une application critique (comme mentionné dans le projet), un LoadBalancer peut répartir le trafic entre plusieurs pods répliqués, garantissant une meilleure disponibilité et une tolérance aux pannes.
+
+3. **Scalabilité**  
+  Avec un LoadBalancer, l'application peut facilement évoluer horizontalement (ajout de répliques de pods). Le trafic est automatiquement équilibré entre les nouvelles instances, assurant une gestion efficace des charges élevées.
+
+4. **Environnement de production**  
+  Le type LoadBalancer est souvent utilisé dans des environnements de production pour fournir un point d'entrée stable et fiable. Cela est particulièrement utile pour App3, qui est une application critique.
+
+5. **Simplicité de configuration**  
+  Contrairement à un NodePort, qui nécessite de connaître l'adresse IP du nœud et le port exposé, un LoadBalancer attribue une adresse IP unique et gère automatiquement le routage du trafic vers les pods.
+
+6. **Support des fournisseurs cloud**  
+  Si le cluster Kubernetes est déployé sur un fournisseur cloud (comme AWS, GCP ou Azure), le type LoadBalancer crée automatiquement un équilibreur de charge natif du cloud, offrant des fonctionnalités avancées comme le routage basé sur les régions ou la gestion SSL.
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -608,6 +636,27 @@ spec:
     - protocol: TCP
       port: 9000
       targetPort: 9000
+```
+
+Ingress pour app3 (app3-ingress.yaml):
+Ce manifeste crée un Ingress pour l'application Django (app3) avec un hôte et un chemin spécifiques.
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app3-ingress
+spec:
+  rules:
+  - host: app3.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app3
+            port:
+              number: 9000
 ```
 
 #### 3.4  Appliquer les manifestes
@@ -722,18 +771,67 @@ http://localhost:8080
 - **Port exposé** : `9000`
 - **Type de service** : `LoadBalancer`
 
-#### Commande pour accéder à App3 :
-Pour rediriger le port local vers le service Kubernetes correspondant, exécutez la commande suivante :
+#### Accéder à App3 via Ingress
 
+L'application App3 (Django) est exposée à l'aide d'un objet Kubernetes **Ingress**. Cela permet de gérer l'accès externe à l'application via un nom d'hôte et un chemin spécifiques.
+
+##### Configuration Ingress pour App3
+
+Le fichier `app3-ingress.yaml` configure un Ingress pour App3 avec les paramètres suivants :
+- **Hôte** : `app3.local`
+- **Chemin** : `/`
+- **Service cible** : `app3`
+- **Port cible** : `9000`
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app3-ingress
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app3
+            port:
+              number: 9000
+```
+
+##### Étapes pour accéder à App3 via Ingress
+
+
+1. **Accéder à l'application** :
+   Une fois le fichier `hosts` configuré **si nécéssaire**, ouvrez un navigateur et accédez à l'URL suivante :
+   ```
+   http://localhost:80
+   ```
+   ou si un hostname est configuré dans le fichier `hosts` (comme `app3.local`), utilisez cette URL :
+   ```
+    http://app3.local
+  ```
+  ````
+
+##### Vérification de l'Ingress
+
+Pour vérifier que l'Ingress est correctement configuré et actif, utilisez la commande suivante :
 ```bash
-kubectl port-forward service/app3 9000:9000
+kubectl get ingress
 ```
 
-Cela redirige le port `9000` du service Kubernetes vers le port `9000` de votre machine locale. Vous pouvez ensuite accéder à l'application Django via l'URL suivante :
+La sortie devrait ressembler à ceci :
+```bash
+NAME            CLASS    HOSTS        ADDRESS        PORTS   AGE
+app3-ingress    <none>   app3.local   192.168.49.2   80      5m
+```
 
-```
-http://localhost:9000
-```
+##### Résumé
+
+Grâce à l'Ingress, App3 est accessible via le nom d'hôte `app3.local` sur le port 80, simplifiant l'accès et permettant une gestion centralisée des règles de routage HTTP/HTTPS.
+
 
 ---
 
@@ -744,14 +842,13 @@ Pour accéder aux trois applications en même temps, vous pouvez exécuter les c
 ```bash
 kubectl port-forward service/app1 30001:80 &
 kubectl port-forward service/app2 8080:8080 &
-kubectl port-forward service/app3 9000:9000 &
 ```
 
 Cela permet de rediriger les ports pour toutes les applications simultanément. Vous pouvez ensuite accéder aux applications via les URL suivantes :
 
 - **App1 (Django)** : [http://localhost:30001](http://localhost:30001)
 - **App2 (Flask)** : [http://localhost:8080](http://localhost:8080)
-- **App3 (Django)** : [http://localhost:9000](http://localhost:9000)
+- **App3 (Django)** : [http://localhost:9000](http://localhost)
 
 ---
 
